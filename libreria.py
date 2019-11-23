@@ -150,6 +150,9 @@ class hormiga(pygame.sprite.Sprite):
 		self.rect.y=55+(int(y/50)-1)*50
 		print(self.rect.x, self.rect.y)
 		self.timeframes=0
+		# Number of move iterations for wait a move to target (problem of bloqueant ants)
+		self.limitTargetWait=10
+		self.iterationsTargetWait=0
 	tiempoMov=0#variable que controla el tiempo de movimiento; el mas rapido es 0
 	def update(self):
 		#Mover izq/der
@@ -223,26 +226,39 @@ class hormiga(pygame.sprite.Sprite):
 			#print("aca")
 			self.timeframes=0
 		
+		# 50 is the number of pixels to move for place in the next cell
 		if(self.caminado>50):#cantidad
 			self.vel_x = 0
 			self.vel_y=0
+			# Number of cells moved to start searching for new item (this prevent to take the same dropped item)
 			if(self.cooldown<=0):
 				if((self.cargada is None) and (self.cosaObjetivo is None) and (not self.modoSoltar)):
+					# Get a list of items that can see the ant (around him)
 					percepcion=self.percibirCosas()
 					if(len(percepcion)>0):
+						# take a random from percepcion list 
 						percibido=random.randint(0, (len(percepcion)-1))
 						percibe=percepcion[percibido]
+						# check if perception item are not already will taken for another ant
 						if(not percibe.buscada):#asegurar que no esta siendo buscado el objeto por otra hormiga
+							# Set item for searching
 							percibe.buscada=True
+							# Make item target for search by ant
 							self.cosaObjetivo=percibe
 							print("percibí!", self.cosaObjetivo.getPosMatriz())
 					else:
 						if(not self.modoSoltar):
 							self.moverse()
 					#print("aqui")
+				# Case when have a target item
 				elif(self.cosaObjetivo is not None):
 					print("trato de moverme")
+					# move to respective rarget
 					self.moverseObjetivo()
+					if(self.iterationsTargetWait>self.limitTargetWait):
+						self.cosaObjetivo.buscada=False
+						self.cosaObjetivo=None
+
 					
 				elif((self.cargada is not None) and (self.mundo.getPosStatusCosas(self.getPosMatriz()) is None)):
 					print("intento soltar")
@@ -282,6 +298,7 @@ class hormiga(pygame.sprite.Sprite):
 	def no_mover(self):
 		self.vel_x = 0
 		self.vel_y = 0
+	# Fix visual position for ant respective to logical position
 	def fixPos(self):# arrega la posición (en caso de que hayan ligeros descuadres)
 		pos=self.getPosMatriz()
 		self.rect.x=55+pos[1]*50
@@ -292,7 +309,7 @@ class hormiga(pygame.sprite.Sprite):
 		pos=self.getPosMatriz()
 		self.fixPos()
 		while True:
-			accion=random.randint(1, 5)
+			accion=random.randint(1, 5)# Get a random movement
 			if(accion==1 and pos[1]>0 and self.percibirHormigas("izquierda")):
 				self.ir_izq()
 				break
@@ -312,76 +329,100 @@ class hormiga(pygame.sprite.Sprite):
 	def moverseObjetivo(self):
 		pos=self.getPosMatriz()
 		posCosa=self.cosaObjetivo.getPosMatriz()
+
 		self.fixPos()
+
+		# direction of row and col movement for ant to reach the object
 		moverseFila=0
 		moverseColumna=0
 		
+		# Check row move
 		if(pos[0]<posCosa[0]):
 			moverseFila=1
 		elif(pos[0]>posCosa[0]):
 			moverseFila=-1
 		else:
 			moverseFila=0
+
+		# Check col move
 		if(pos[1]<posCosa[1]):
 			moverseColumna=1
 		elif(pos[1]>posCosa[1]):
 			moverseColumna=-1
 		else:
 			moverseColumna=0
-		print(moverseFila, moverseColumna)
+		# print(moverseFila, moverseColumna)
+		# If required movments are Row and Col
 		if((not moverseFila==0) and (not moverseColumna==0)):
+			# Reset target wait
+			
+			# Random action for first move Row or Col
 			accion=random.randint(1, 2)
 			if(accion==1):
 				if(moverseFila==1 and self.percibirHormigas("abajo")):
 					self.ir_aba()
+					self.iterationsTargetWait=0
 					return
 				elif(moverseFila==-1 and self.percibirHormigas("arriba")):
 					self.ir_arr()
+					self.iterationsTargetWait=0
 					return
-				self.no_mover()
-				return
 			else:
 				if(moverseColumna==1 and self.percibirHormigas("derecha")):
 					self.ir_der()
+					self.iterationsTargetWait=0
 					return
 				elif(moverseColumna==-1 and self.percibirHormigas("izquierda")):
 					self.ir_izq()
+					self.iterationsTargetWait=0
 					return
+			
 		elif(not moverseFila==0):
+			# Reset target wait
+			self.iterationsTargetWait=0
 			if(moverseFila==1 and self.percibirHormigas("abajo")):
 				self.ir_aba()
+				self.iterationsTargetWait=0
 				return
 			elif(moverseFila==-1 and self.percibirHormigas("arriba")):
 				self.ir_arr()
+				self.iterationsTargetWait=0
 				return
 			# print(self.percibirHormigas("derecha"), self.percibirHormigas("izquierda"))
 			# print(self.mundo.mapaCosas)
 			# print("---")
 			# print(self.mundo.mapaHormigas)
-			self.no_mover()
-			return
 		elif(not moverseColumna==0):
+			# Reset target wait
 			if(moverseColumna==1 and self.percibirHormigas("derecha")):
 				self.ir_der()
+				self.iterationsTargetWait=0
 				return
 			elif(moverseColumna==-1 and self.percibirHormigas("izquierda")):
 				self.ir_izq()
+				self.iterationsTargetWait=0
 				return
 			# print(self.percibirHormigas("derecha"), self.percibirHormigas("izquierda"))
 			# print(self.mundo.mapaCosas)
 			# print("---")
 			# print(self.mundo.mapaHormigas)
-			self.no_mover()
-			return
 		
 		else:#caso e que esta sobre el objeto
-			self.recojer()
-			print("intento recojer")
-		
+			
+			self.recoger()
+			print("intento recoger")
+			return
+		# Stop Movement because is not possible Yet make a movement
+		self.no_mover()
+		# Sum times target wait
+		self.iterationsTargetWait+=1
+		return
+	# Return Row, Col position index, (Y,X)
 	def getPosMatriz(self):
 		posC=int(self.rect.x/50)-1
 		posF=int(self.rect.y/50)-1
 		return (posF, posC)
+	# Verify if are not ant on position (possible movements), this grants not double ants on same cell
 	def percibirHormigas(self, lado):
 		fila, columna=self.getPosMatriz()
 		if(lado=="izquierda" and columna>0):
@@ -442,26 +483,35 @@ class hormiga(pygame.sprite.Sprite):
 				cosas.append(self.mundo.mapaCosas[fila][columna])
 				
 		return cosas
-		
-	def recojer(self):
+	
+	## HERE a formule
+	def recoger(self):
+		# Quantity of number of same objects
 		parecidos=0
 		listaPercibidos=self.percibirCosas()
+		# Get number of same objects from vision range  of perception
 		for i in listaPercibidos:
 			if(i.tipoCosa==self.cosaObjetivo.tipoCosa):
 				parecidos+=1
+		
 		diferentes=8-parecidos
 		valorAlpha=8#maximo de diferentes posibles
+
+		# At more different values, lesser posibility
 		valorF=1-(diferentes/valorAlpha)
+		# Constant 
 		constanteK1=1
-		recojerProb=(constanteK1/constanteK1+valorF)
+		recogerProb=(constanteK1/(constanteK1+valorF))
+
 		suerte=random.uniform(0, 1.0)
-		if(recojerProb>=suerte):
+		if(recogerProb>=suerte):
 			self.cosaObjetivo.buscada=False
 			self.cargada=self.cosaObjetivo
 			fila, columna=self.cargada.getPosMatriz()
 			self.mundo.removeCosa(fila, columna)
 			self.cosaObjetivo=None
 			self.cooldown=15
+			self.iterationsTargetWait=0
 		else:
 			self.cooldown=10
 			self.cosaObjetivo.buscada=False
@@ -475,9 +525,11 @@ class hormiga(pygame.sprite.Sprite):
 				parecidos+=1
 		diferentes=8-parecidos
 		valorAlpha=8#maximo de diferentes posibles
+
 		valorF=1-(diferentes/valorAlpha)
-		constanteK2=1
-		soltarProb=(valorF/constanteK2+valorF)
+		constanteK2=0.1
+		soltarProb=(valorF/(constanteK2+valorF))
+
 		suerte=random.uniform(0, 1)
 		if(soltarProb>=suerte):
 			self.cargada.setPos(self.rect.x, self.rect.y)
